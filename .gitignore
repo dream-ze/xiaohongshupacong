@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local database files
+*.db
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Runtime / logs
+*.log
+
+# Playwright/browser temp
+playwright-report/

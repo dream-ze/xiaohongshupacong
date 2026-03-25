@@ -1,0 +1,192 @@
+很好，这一步其实已经跑通核心链路了 👍
+你现在的问题不是“爬不到”，而是：
+
+👉 字段缺失（title / content / cover / tags 空）
+
+这个我帮你直接定位原因 + 给你修法👇
+
+❗问题本质
+
+你现在的数据来源是：
+
+搜索接口（search/notes）
+
+这个接口本身：
+
+👉 就不返回完整数据
+
+搜索接口只给这些（你现在已有的）
+
+✔ note_id
+✔ author
+✔ liked_count
+✔ 简单 desc（有时还没有）
+✔ cover（有时在 image_list）
+
+不会给这些 ❌
+title（很多为空）
+content（正文）
+tags（标签）
+评论
+图片完整列表
+🔥 正确逻辑（你差最后一步）
+
+你现在已经做了：
+
+搜索 → 入库 → 导出
+
+但应该是：
+
+搜索 → 详情补全 → 入库 → 导出
+🧠 为什么你现在缺字段
+
+因为你这行：
+
+"need_detail": false
+
+👉 你在测试时关掉了详情补全
+
+✅ 立刻验证（你先这样做）
+
+再跑一次：
+
+curl -X POST "http://127.0.0.1:8000/xhs/crawl" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"keyword\":\"咖啡\",\"page_count\":1,\"page_size\":5,\"need_detail\":true,\"need_comments\":false,\"need_export\":true}"
+📊 你会看到变化
+
+Excel里这些字段会出现：
+
+字段	变化
+title	✅ 有值
+desc	✅ 更完整
+content	✅ 有正文
+tags	✅ 有
+cover_url	✅ 更稳定
+⚠️ 但你现在还有两个真实问题（我帮你提前说）
+1️⃣ content 质量不高
+
+你现在用的是：
+
+page.locator("body").inner_text()
+
+👉 问题：
+
+会抓到整页
+很乱
+2️⃣ cover_url 有时为空
+
+因为你只取：
+
+image_list[0]
+
+但有些笔记：
+
+是视频
+或字段结构变了
+🚀 我帮你优化一版（直接改）
+✅ 1. 优化详情解析（关键）
+
+把 detail_parser.py 改成这样👇
+
+def parse_note_detail_from_page(page, note_url: str) -> dict:
+    page.goto(note_url, wait_until="domcontentloaded")
+    page.wait_for_timeout(3000)
+
+    title = ""
+    desc = ""
+    content = ""
+    tags = []
+    cover = ""
+
+    # title
+    try:
+        title = page.locator("meta[property='og:title']").get_attribute("content") or ""
+    except:
+        pass
+
+    # desc
+    try:
+        desc = page.locator("meta[name='description']").get_attribute("content") or ""
+    except:
+        pass
+
+    # cover（关键修复）
+    try:
+        cover = page.locator("meta[property='og:image']").get_attribute("content") or ""
+    except:
+        pass
+
+    # 正文（优化）
+    try:
+        paragraphs = page.locator("p").all_inner_texts()
+        content = "\n".join(paragraphs[:20])
+    except:
+        pass
+
+    # 标签（优化）
+    try:
+        tag_elements = page.locator("a").all_inner_texts()
+        tags = [t.strip() for t in tag_elements if t.strip().startswith("#")][:10]
+    except:
+        pass
+
+    return {
+        "title": title,
+        "desc": desc,
+        "content": content,
+        "tags": tags,
+        "cover_url": cover,
+        "note_url": note_url,
+    }
+✅ 2. 更新 detail_service
+note["cover_url"] = detail.get("cover_url") or note.get("cover_url")
+🧪 你再验证一次
+
+重点看 Excel：
+
+✔ 应该有
+title
+content
+tags
+cover_url
+❗如果还是缺字段（关键判断）
+情况1：detail也空
+
+👉 说明：
+页面结构变了，需要换 selector
+
+情况2：title有，content很少
+
+👉 正常，因为小红书正文是动态渲染
+
+💡 下一步（你这个项目的关键升级）
+
+你现在已经进入第二阶段了：
+
+👉 数据质量优化
+
+接下来建议你做：
+
+1️⃣ 正文结构解析（更干净）
+2️⃣ 评论真实抓取（不是 mock）
+3️⃣ 标签标准化（做知识库用）
+4️⃣ 爆款打标（点赞/评论比）
+🎯 总结一句话
+
+你现在不是“爬不到数据”，而是：
+
+👉 只拿了搜索层数据，没做详情层补全
+
+👉 下一步我可以帮你做
+
+如果你继续往下做，我可以直接帮你：
+
+🔥 做一版“爆款分析模块”
+
+自动筛选高点赞内容
+提取标题结构
+提取评论痛点
+输出 AI 改写模板
+
+你这个项目就直接进入能卖的阶段了 🚀
